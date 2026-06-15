@@ -1,0 +1,18 @@
+{
+  "name": "凪 — 心の水面",
+  "short_name": "凪",
+  "description": "触れるほど乱れ、待つほど澄む idle。心の水面を凪がせる。勝利条件は、プレイしなくて済むこと。測らない・煽らない・送信なし。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#060c17",
+  "theme_color": "#060c17",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

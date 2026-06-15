@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#060c17">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg">
+  <title>凪 — 心の水面</title>
+  <style>
+    :root {
+      --bg: #060c17;
+      --surface: #0a1628;
+      --border: #162338;
+      --text: #e8edf5;
+      --text-2: #9aafc9;
+      --text-3: #5a7a9e;
+      --text-4: #2e4a68;
+      --accent: #4a9ed8;
+      --font: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; -webkit-tap-highlight-color: transparent; }
+
+    #cv { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+    #tap { position: fixed; inset: 0; z-index: 1; cursor: pointer; }
+
+    /* Main UI grid: pointer-events none → children opt in */
+    #ui {
+      position: fixed; inset: 0; z-index: 2;
+      display: grid; grid-template-rows: auto 1fr auto;
+      pointer-events: none;
+      padding: env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+    }
+
+    /* TOP */
+    #top { padding: max(env(safe-area-inset-top,14px),14px) 20px 0; }
+    .bar-lbl { font-size: 11px; color: var(--text-3); letter-spacing: .08em; margin-bottom: 5px; }
+    .bar-track { height: 2px; background: var(--border); border-radius: 2px; }
+    .bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .4s; }
+    #satori-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; }
+    #satori-num { font-size: 18px; font-weight: 300; color: var(--text); }
+    .unit { font-size: 11px; color: var(--text-3); margin-left: 3px; }
+
+    /* CENTER */
+    #center { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 16px; gap: 14px; }
+    #disturb { font-size: 13px; color: var(--text-2); opacity: 0; transition: opacity .4s; pointer-events: none; }
+    #disturb.on { opacity: 1; }
+    #hint { font-size: 11px; color: var(--text-3); opacity: 0; transition: opacity .5s; pointer-events: none; text-align: center; }
+    #hint.on { opacity: 1; }
+
+    #eyes-btn {
+      pointer-events: auto;
+      background: rgba(10,22,40,.78); border: 1px solid var(--border); border-radius: 40px;
+      padding: 11px 28px; color: var(--text-2); font-size: 14px; font-family: var(--font);
+      cursor: pointer; backdrop-filter: blur(10px); transition: background .3s, border-color .3s, color .3s;
+    }
+    #eyes-btn.closed { background: rgba(74,158,216,.12); border-color: var(--accent); color: var(--text); }
+
+    /* BOTTOM */
+    #bottom { padding: 0 20px max(env(safe-area-inset-bottom,16px),16px); display: flex; flex-direction: column; gap: 8px; }
+    #shop-btn {
+      pointer-events: auto; align-self: center;
+      background: none; border: none; color: var(--text-3); font-size: 11px; letter-spacing: .08em;
+      cursor: pointer; font-family: var(--font); padding: 4px 0;
+    }
+    #phil-row {
+      display: none; flex-wrap: nowrap; gap: 10px; overflow-x: auto; padding-bottom: 2px;
+      scrollbar-width: none; pointer-events: auto;
+    }
+    #phil-row::-webkit-scrollbar { display: none; }
+    .pc {
+      flex: 0 0 auto; min-width: 108px;
+      background: rgba(10,22,40,.88); border: 1px solid var(--border); border-radius: 12px;
+      padding: 10px 12px; cursor: pointer; transition: border-color .2s, background .2s;
+      backdrop-filter: blur(8px);
+    }
+    .pc:hover:not(.dim) { border-color: var(--accent); }
+    .pc.got { border-color: rgba(74,158,216,.5); background: rgba(74,158,216,.08); cursor: default; }
+    .pc.dim { opacity: .35; cursor: default; }
+    .pn { font-size: 12px; color: var(--text); }
+    .ps { font-size: 10px; color: var(--text-3); margin: 2px 0 6px; }
+    .pc-cost { font-size: 11px; color: var(--accent); }
+    .pc-got { font-size: 10px; color: var(--accent); }
+
+    /* TOAST */
+    #toast {
+      position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
+      max-width: min(320px,calc(100vw - 40px)); z-index: 10;
+      background: rgba(10,22,40,.93); border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px 16px; font-size: 13px; line-height: 1.75; color: var(--text);
+      backdrop-filter: blur(14px); text-align: center;
+      opacity: 0; pointer-events: none; transition: opacity .4s;
+    }
+    #toast.on { opacity: 1; }
+    #toast-src { font-size: 10px; color: var(--text-3); margin-top: 6px; }
+
+    /* KEKKOU */
+    #kekkou {
+      position: fixed; inset: 0; z-index: 20;
+      background: rgba(6,12,23,.94); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 22px; padding: 44px;
+      opacity: 0; pointer-events: none; transition: opacity 2s;
+    }
+    #kekkou.on { opacity: 1; pointer-events: auto; }
+    #kekkou h1 { font-size: 28px; font-weight: 300; letter-spacing: .2em; color: var(--text); }
+    #kekkou p { font-size: 15px; line-height: 1.95; color: var(--text-2); text-align: center; }
+    #kk-close {
+      margin-top: 10px; background: none; border: 1px solid var(--border); border-radius: 30px;
+      padding: 9px 26px; color: var(--text-3); font-family: var(--font); font-size: 13px; cursor: pointer;
+    }
+
+    /* TUTORIAL overlay */
+    #tutorial {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(6,12,23,.96); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 0; padding: 32px 28px;
+    }
+    #tut-slides { width: 100%; max-width: 320px; }
+    .tut-slide { display: none; flex-direction: column; gap: 18px; text-align: center; }
+    .tut-slide.active { display: flex; }
+    .tut-icon { font-size: 42px; line-height: 1; }
+    .tut-title { font-size: 18px; font-weight: 300; letter-spacing: .12em; color: var(--text); }
+    .tut-body { font-size: 14px; line-height: 1.85; color: var(--text-2); }
+    .tut-note { font-size: 11px; color: var(--text-3); line-height: 1.7; }
+    #tut-dots { display: flex; gap: 7px; justify-content: center; margin-top: 28px; }
+    .tut-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: background .3s; }
+    .tut-dot.active { background: var(--accent); }
+    #tut-next {
+      margin-top: 20px; background: rgba(74,158,216,.12); border: 1px solid var(--accent);
+      border-radius: 40px; padding: 12px 36px; color: var(--text); font-family: var(--font);
+      font-size: 14px; cursor: pointer; width: 100%; max-width: 320px;
+    }
+    #tut-skip {
+      margin-top: 10px; background: none; border: none; color: var(--text-4);
+      font-family: var(--font); font-size: 11px; cursor: pointer; padding: 4px;
+    }
+
+    /* SETTINGS */
+    #set-btn {
+      position: fixed; top: max(env(safe-area-inset-top,12px),12px); right: max(env(safe-area-inset-right,14px),14px);
+      z-index: 30; background: none; border: none; color: var(--text-4); font-size: 18px; cursor: pointer; padding: 5px;
+    }
+    #set-sheet {
+      position: fixed; inset: 0; z-index: 40;
+      background: rgba(6,12,23,.65); display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity .3s;
+    }
+    #set-sheet.on { opacity: 1; pointer-events: auto; }
+    .sh-body {
+      width: 100%; background: var(--surface); border-radius: 18px 18px 0 0;
+      border-top: 1px solid var(--border);
+      padding: 22px 22px max(env(safe-area-inset-bottom,22px),22px);
+      transform: translateY(100%); transition: transform .35s cubic-bezier(.32,.72,0,1);
+    }
+    #set-sheet.on .sh-body { transform: translateY(0); }
+    .sh-title { font-size: 12px; color: var(--text-3); letter-spacing: .08em; margin-bottom: 16px; }
+    .sh-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .sh-lbl { font-size: 13px; color: var(--text); }
+    .sh-val { font-size: 10px; color: var(--text-3); max-width: 57%; word-break: break-all; line-height: 1.5; text-align: right; }
+    .sh-dev { font-size: 11px; color: var(--text-4); margin-top: 14px; line-height: 1.6; }
+    .sh-close { display: block; width: 100%; background: none; border: 1px solid var(--border); border-radius: 10px; padding: 11px; color: var(--text-3); font-family: var(--font); font-size: 13px; cursor: pointer; margin-top: 14px; }
+    .sh-reset { display: block; width: 100%; background: none; border: 1px solid rgba(180,60,60,.28); border-radius: 10px; padding: 10px; color: rgba(180,70,70,.65); font-family: var(--font); font-size: 12px; cursor: pointer; margin-top: 6px; }
+
+    @keyframes rise { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="cv"></canvas>
+<div id="tap"></div>
+
+<div id="ui">
+  <div id="top">
+    <div class="bar-lbl">静けさ — <span id="st-num">50</span></div>
+    <div class="bar-track"><div class="bar-fill" id="st-fill" style="width:50%"></div></div>
+    <div id="satori-row">
+      <div><span id="satori-num">0</span><span class="unit">悟り</span></div>
+    </div>
+  </div>
+  <div id="center">
+    <div id="disturb"></div>
+    <div id="hint"></div>
+    <button id="eyes-btn">目を閉じる</button>
+  </div>
+  <div id="bottom">
+    <button id="shop-btn">哲学者を招く ▾</button>
+    <div id="phil-row"></div>
+  </div>
+</div>
+
+<div id="toast"><div id="toast-txt"></div><div id="toast-src"></div></div>
+
+<div id="kekkou">
+  <h1>結</h1>
+  <p>水面は鏡になった。<br>もう、閉じていい。</p>
+  <button id="kk-close">静かに続ける</button>
+</div>
+
+<div id="tutorial">
+  <div id="tut-slides">
+    <div class="tut-slide active" data-slide="0">
+      <div class="tut-icon">〜</div>
+      <div class="tut-title">凪</div>
+      <div class="tut-body">心の水面を、凪がせる idle。<br>触れるほど乱れ、待つほど澄む。<br>勝利条件は、プレイしなくて済むこと。</div>
+    </div>
+    <div class="tut-slide" data-slide="1">
+      <div class="tut-icon">👆</div>
+      <div class="tut-title">触れると、乱れる</div>
+      <div class="tut-body">画面をタップすると波が立ち、<strong style="color:var(--text)">静けさ</strong>が下がる。<br>そのままにしておくと、自然と凪いでいく。</div>
+      <div class="tut-note">煩悩も時々湧いてくる。それも人生。</div>
+    </div>
+    <div class="tut-slide" data-slide="2">
+      <div class="tut-icon">🌊</div>
+      <div class="tut-title">目を閉じると、育つ</div>
+      <div class="tut-body">「目を閉じる」ボタンで、<br><strong style="color:var(--text)">悟り</strong>の蓄積が約1.9倍になる。<br>タップで開くと、また乱れる。</div>
+      <div class="tut-note">悟りで哲学者を招け、回復が速まる。</div>
+    </div>
+    <div class="tut-slide" data-slide="3">
+      <div class="tut-icon">✦</div>
+      <div class="tut-title">離れていいし、戻っていい</div>
+      <div class="tut-body">アプリを閉じている間も、<br>心は勝手に凪いでいく。<br>ペナルティはない。</div>
+      <div class="tut-note">静けさが98以上を7秒保つと、「結」に至る。</div>
+    </div>
+  </div>
+  <div id="tut-dots"></div>
+  <button id="tut-next">次へ</button>
+  <button id="tut-skip">スキップ</button>
+</div>
+
+<button id="set-btn">⋯</button>
+
+<div id="set-sheet">
+  <div class="sh-body">
+    <div class="sh-title">凪 / Nagi — 開発者・寄付</div>
+    <div id="sh-rows"></div>
+    <div class="sh-dev">© 2026 田中志 / Ataraxia Works<br>すべてのデータは端末の中だけ。送信なし。</div>
+    <button class="sh-reset" id="reset-btn">手放す（リセット）</button>
+    <button class="sh-close" id="sh-close-btn">閉じる</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const DEV_INFO = { name: '田中志（たなかしるす）' };
+const DONATIONS = [
+  { label: 'ビットコイン（BTC）', address: '1EHshWSHyvJFjkAYQ5rPX7nKo2FRKWF58f' },
+  { label: 'イーサリアム（ETH）', address: '0xb7da6af09c0f8db95d0c0e352e32d1915483931e' },
+];
+
+const PHILS = [
+  { id:'epictetus', name:'エピクテトス', school:'ストア派',   cost:8,   calm:0.10,
+    quote:'人を乱すのは出来事ではなく、それについての思い込みである。',
+    src:'エピクテトス『エンキリディオン』' },
+  { id:'epicurus',  name:'エピクロス',   school:'快楽の庭', cost:22,  calm:0.18,
+    quote:'苦しみのないところに、静けさが宿る。足るを知ることが、最大の富である。',
+    src:'エピクロス『メノイケウスへの手紙』' },
+  { id:'pyrrho',    name:'ピュロン',     school:'懐疑派',   cost:48,  calm:0.28,
+    quote:'すべての判断を停止せよ——そこにアタラクシアが生まれる。',
+    src:'ピュロン（セクストスによる伝承）' },
+  { id:'zhuangzi',  name:'荘子',         school:'道家',     cost:95,  calm:0.42,
+    quote:'水は争わず、しかも万物を養う。無為にして、なさざるなし。',
+    src:'荘子『外篇』' },
+  { id:'marcus',    name:'マルクス',     school:'ストア派',   cost:175, calm:0.62,
+    quote:'心の中にこそ力がある。外の出来事ではなく、それをどう見るかが、すべてを決める。',
+    src:'マルクス・アウレリウス『自省録』' },
+  { id:'buddha',    name:'釈尊',         school:'縁起',     cost:300, calm:0.90,
+    quote:'執着が苦しみを生む。手放すことが、安らぎへの道である。',
+    src:'法句経（ダンマパダ）より' },
+  { id:'seneca',    name:'セネカ',       school:'ストア派',   cost:480, calm:1.30,
+    quote:'どこへ逃げても、自分自身からは逃げられない。まず、内を静めよ。',
+    src:'セネカ『書簡集』' },
+];
+
+const DISTURBS = ['渇望','怒り','不安','執着','退屈','後悔','嫉妬','焦り','見栄','比較'];
+
+/* === STATE === */
+const INIT = { stillness:50, satori:0, invited:[], eyesClosed:false, lastSeen:null, tapCount:0, tutDone:false };
+let S = { ...INIT };
+
+function load() {
+  try { const r = localStorage.getItem('nagi-v1'); if (r) S = { ...INIT, ...JSON.parse(r) }; } catch {}
+}
+function save() {
+  try { S.lastSeen = Date.now(); localStorage.setItem('nagi-v1', JSON.stringify(S)); } catch {}
+}
+
+function getCalm() {
+  return 0.55 + S.invited.reduce((a, id) => {
+    const p = PHILS.find(ph => ph.id === id);
+    return a + (p ? p.calm : 0);
+  }, 0);
+}
+
+function catchUp() {
+  const now = Date.now();
+  const elapsed = Math.min((now - (S.lastSeen || now)) / 1000, 86400);
+  if (elapsed > 30) {
+    const calm = getCalm();
+    const s0 = S.stillness;
+    S.stillness = Math.min(100, s0 + calm * elapsed);
+    const rateAvg = 0.9 * Math.pow((s0 + S.stillness) / 200, 1.6);
+    S.satori += rateAvg * elapsed;
+    const label = elapsed >= 3600
+      ? Math.floor(elapsed/3600) + '時間'
+      : elapsed >= 60 ? Math.floor(elapsed/60) + '分'
+      : Math.floor(elapsed) + '秒';
+    showToast('離れていたあいだに、心は凪いだ。', label + 'のあいだ、静けさが育ちました。', 3500);
+  }
+  S.lastSeen = now;
+}
+
+/* === CANVAS === */
+const cv = document.getElementById('cv');
+const cx = cv.getContext('2d');
+let W, H;
+
+function resize() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+let ripples = [];
+function addRipple(x, y, size, disturb) {
+  ripples.push({ x, y, r:0, max:50+size*65, life:1.0, decay:0.005+Math.random()*.005, size, disturb:!!disturb });
+}
+
+function drawFrame(st) {
+  // Background gradient: deeper/richer blue as stillness rises
+  const bg = cx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, `hsl(212,${52+st*.32}%,${4.5+st*.04}%)`);
+  bg.addColorStop(1, `hsl(220,${62+st*.28}%,${2.5+st*.03}%)`);
+  cx.fillStyle = bg; cx.fillRect(0, 0, W, H);
+
+  // Mirror sheen when very calm
+  if (st > 70) {
+    const a = (st - 70) / 100;
+    const sg = cx.createLinearGradient(0, H*.44, 0, H*.56);
+    sg.addColorStop(0, 'rgba(74,158,216,0)');
+    sg.addColorStop(.5, `rgba(74,158,216,${a*.065})`);
+    sg.addColorStop(1, 'rgba(74,158,216,0)');
+    cx.fillStyle = sg; cx.fillRect(0, H*.44, W, H*.12);
+  }
+
+  // Ripples
+  for (const r of ripples) {
+    const rgb = r.disturb ? '180,100,118' : '74,158,216';
+    cx.beginPath(); cx.arc(r.x, r.y, r.r, 0, Math.PI*2);
+    cx.strokeStyle = `rgba(${rgb},${r.life*.42*Math.min(r.size,2)})`;
+    cx.lineWidth = .8 + r.size*.35; cx.stroke();
+    if (r.r > 18) {
+      cx.beginPath(); cx.arc(r.x, r.y, r.r*.55, 0, Math.PI*2);
+      cx.strokeStyle = `rgba(${rgb},${r.life*.18*Math.min(r.size,2)})`;
+      cx.lineWidth = .4; cx.stroke();
+    }
+  }
+}
+
+/* === GAME LOOP === */
+let last=0, disturbT=0, nextD=rand(3500,7500), kekkouT=0, kekkouShown=false;
+let uiT=0, saveT=0;
+let disturbTimer=0, hintTimer=0, toastTimer=0;
+
+function rand(a,b) { return a + Math.random()*(b-a); }
+
+function tick(ts) {
+  requestAnimationFrame(tick);
+  const dt = Math.min((ts - last) / 1000, .1);
+  last = ts;
+  if (dt <= 0 || !S.tutDone) return;
+
+  const mul = S.eyesClosed ? 1.9 : 1.0;
+  const calm = getCalm();
+
+  S.stillness = Math.min(100, S.stillness + calm * mul * dt);
+  S.satori += 0.9 * Math.pow(Math.max(0, S.stillness) / 100, 1.6) * mul * dt;
+
+  disturbT += dt * 1000;
+  if (disturbT >= nextD) { disturbT = 0; nextD = rand(3500, 7500); triggerDisturb(); }
+
+  if (!kekkouShown) {
+    if (S.stillness >= 98) { kekkouT += dt; if (kekkouT >= 7) triggerKekkou(); }
+    else kekkouT = 0;
+  }
+
+  // Idle micro-ripples (less when calm)
+  if (!S.eyesClosed && Math.random() < (1 - S.stillness/100) * .016) {
+    addRipple(W*(.25+Math.random()*.5), H*(.3+Math.random()*.4), .2, false);
+  }
+
+  ripples = ripples.filter(r => r.life > 0);
+  for (const r of ripples) { r.r += (r.max - r.r) * .042; r.life -= r.decay; }
+
+  drawFrame(S.stillness);
+
+  if (ts - uiT > 80) { uiT = ts; updateUI(); }
+  if (ts - saveT > 10000) { saveT = ts; save(); }
+}
+
+function updateUI() {
+  const st = Math.round(S.stillness);
+  document.getElementById('st-num').textContent = st;
+  document.getElementById('st-fill').style.width = st + '%';
+  document.getElementById('satori-num').textContent = Math.floor(S.satori);
+  if (shopOpen) renderPhilCards();
+}
+
+/* === EVENTS === */
+function triggerDisturb() {
+  const drop = 7 + Math.random() * 5;
+  S.stillness = Math.max(0, S.stillness - drop);
+  kekkouT = 0;
+  const x = W*(.25+Math.random()*.5), y = H*(.3+Math.random()*.4);
+  addRipple(x, y, 1.6, true);
+  addRipple(x+14, y-10, .9, true);
+  const lbl = DISTURBS[Math.floor(Math.random()*DISTURBS.length)];
+  const el = document.getElementById('disturb');
+  el.textContent = lbl + 'が湧いた'; el.classList.add('on');
+  clearTimeout(disturbTimer);
+  disturbTimer = setTimeout(() => el.classList.remove('on'), 2200);
+}
+
+function onTap(x, y) {
+  if (!S.tutDone) return;
+  if (S.eyesClosed) { S.eyesClosed = false; updateEyesBtn(); }
+  S.stillness = Math.max(0, S.stillness - 5);
+  kekkouT = 0;
+  S.tapCount++;
+  addRipple(x, y, 1.1, false);
+  if (S.tapCount === 3) showHint('触れぬほど、澄む。');
+}
+
+function triggerKekkou() {
+  if (kekkouShown) return;
+  kekkouShown = true;
+  document.getElementById('kekkou').classList.add('on');
+  save();
+}
+
+function showHint(msg) {
+  const el = document.getElementById('hint');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => el.classList.remove('on'), 3200);
+}
+
+function showToast(txt, src, dur) {
+  document.getElementById('toast-txt').textContent = txt;
+  document.getElementById('toast-src').textContent = src || '';
+  const t = document.getElementById('toast'); t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), dur || 5000);
+}
+
+function updateEyesBtn() {
+  const btn = document.getElementById('eyes-btn');
+  if (S.eyesClosed) { btn.classList.add('closed'); btn.textContent = '目を開く'; }
+  else { btn.classList.remove('closed'); btn.textContent = '目を閉じる'; }
+}
+
+function invitePhil(id) {
+  const ph = PHILS.find(p => p.id === id);
+  if (!ph || S.invited.includes(id) || S.satori < ph.cost) return;
+  S.satori -= ph.cost;
+  S.invited.push(id);
+  showToast(ph.quote, ph.name + ' ・ ' + ph.src);
+  renderPhilCards();
+  save();
+}
+
+/* === PHIL CARDS === */
+let shopOpen = false;
+function renderPhilCards() {
+  const row = document.getElementById('phil-row');
+  row.innerHTML = '';
+  for (const ph of PHILS) {
+    const got = S.invited.includes(ph.id);
+    const can = S.satori >= ph.cost;
+    const d = document.createElement('div');
+    d.className = 'pc' + (got ? ' got' : '') + (!got && !can ? ' dim' : '');
+    d.innerHTML = `<div class="pn">${ph.name}</div><div class="ps">${ph.school}</div>`
+      + (got ? `<div class="pc-got">招いた ✓</div>` : `<div class="pc-cost">悟り ${ph.cost}</div>`);
+    if (got) {
+      d.addEventListener('click', e => { e.stopPropagation(); showToast(ph.quote, ph.name + ' ・ ' + ph.src); });
+    } else if (can) {
+      d.addEventListener('click', e => { e.stopPropagation(); invitePhil(ph.id); });
+    }
+    row.appendChild(d);
+  }
+}
+
+/* === TUTORIAL === */
+const TUT_COUNT = 4;
+let tutSlide = 0;
+
+function renderTutDots() {
+  const el = document.getElementById('tut-dots'); el.innerHTML = '';
+  for (let i = 0; i < TUT_COUNT; i++) {
+    const d = document.createElement('div');
+    d.className = 'tut-dot' + (i === tutSlide ? ' active' : '');
+    el.appendChild(d);
+  }
+}
+
+function goTutSlide(n) {
+  document.querySelector(`.tut-slide[data-slide="${tutSlide}"]`).classList.remove('active');
+  tutSlide = n;
+  document.querySelector(`.tut-slide[data-slide="${n}"]`).classList.add('active');
+  renderTutDots();
+  const btn = document.getElementById('tut-next');
+  btn.textContent = n === TUT_COUNT - 1 ? 'はじめる' : '次へ';
+}
+
+function endTutorial() {
+  S.tutDone = true;
+  document.getElementById('tutorial').style.display = 'none';
+  save();
+}
+
+document.getElementById('tut-next').addEventListener('click', () => {
+  if (tutSlide < TUT_COUNT - 1) goTutSlide(tutSlide + 1);
+  else endTutorial();
+});
+document.getElementById('tut-skip').addEventListener('click', endTutorial);
+
+/* === SETTINGS === */
+function renderSettings() {
+  const el = document.getElementById('sh-rows'); el.innerHTML = '';
+  const add = (l, v) => {
+    const d = document.createElement('div'); d.className = 'sh-row';
+    d.innerHTML = `<span class="sh-lbl">${l}</span><span class="sh-val">${v}</span>`;
+    el.appendChild(d);
+  };
+  add('開発者', DEV_INFO.name);
+  for (const d of DONATIONS) add(d.label, d.address);
+}
+
+/* === BIND EVENTS === */
+document.getElementById('tap').addEventListener('click', e => onTap(e.clientX, e.clientY));
+document.getElementById('tap').addEventListener('touchstart', e => {
+  const t = e.touches[0]; onTap(t.clientX, t.clientY); e.preventDefault();
+}, { passive: false });
+
+document.getElementById('eyes-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  if (!S.eyesClosed) { S.eyesClosed = true; updateEyesBtn(); }
+  else { S.eyesClosed = false; updateEyesBtn(); onTap(W/2, H/2); }
+});
+
+document.getElementById('shop-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  shopOpen = !shopOpen;
+  const row = document.getElementById('phil-row');
+  const btn = document.getElementById('shop-btn');
+  if (shopOpen) { row.style.display = 'flex'; btn.textContent = '哲学者を招く ▴'; renderPhilCards(); }
+  else { row.style.display = 'none'; btn.textContent = '哲学者を招く ▾'; }
+});
+
+document.getElementById('kk-close').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('kekkou').classList.remove('on');
+  kekkouShown = false; kekkouT = 0;
+});
+
+document.getElementById('set-btn').addEventListener('click', e => {
+  e.stopPropagation(); renderSettings();
+  document.getElementById('set-sheet').classList.add('on');
+});
+document.getElementById('sh-close-btn').addEventListener('click', () => {
+  document.getElementById('set-sheet').classList.remove('on');
+});
+document.getElementById('set-sheet').addEventListener('click', e => {
+  if (e.target === document.getElementById('set-sheet'))
+    document.getElementById('set-sheet').classList.remove('on');
+});
+document.getElementById('reset-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  if (confirm('手放しますか？\nすべての静けさと悟りが戻ります。')) {
+    S = { ...INIT, tutDone: true, lastSeen: Date.now() };
+    kekkouT = 0; kekkouShown = false;
+    document.getElementById('kekkou').classList.remove('on');
+    document.getElementById('set-sheet').classList.remove('on');
+    updateEyesBtn(); updateUI(); save();
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') catchUp();
+  else save();
+});
+
+/* === INIT === */
+load();
+if (!S.tutDone) { renderTutDots(); }
+else { document.getElementById('tutorial').style.display = 'none'; }
+catchUp();
+updateEyesBtn();
+renderSettings();
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+
+last = performance.now();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
