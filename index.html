@@ -324,6 +324,12 @@ function resize() { W = cv.width = window.innerWidth; H = cv.height = window.inn
 window.addEventListener('resize', resize);
 resize();
 
+// §2-4: 動きを減らす設定を尊重する（環境の変更にも追従）
+const rmQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+let reduceMotion = rmQuery.matches;
+rmQuery.addEventListener('change', e => { reduceMotion = e.matches; });
+
+let eyesDim = 0; // 目を閉じている度合い（0→1）。縁をそっと暗くする。
 let ripples = [];
 function addRipple(x, y, size, disturb) {
   ripples.push({ x, y, r:0, max:50+size*65, life:1.0, decay:0.005+Math.random()*.005, size, disturb:!!disturb });
@@ -358,6 +364,14 @@ function drawFrame(st) {
       cx.lineWidth = .4; cx.stroke();
     }
   }
+
+  // 目を閉じている間は、画面の縁をそっと暗くする（クリッカーの逆＝内に籠る感覚）
+  if (eyesDim > 0.01) {
+    const v = cx.createRadialGradient(W/2, H/2, Math.min(W, H)*0.18, W/2, H/2, Math.max(W, H)*0.62);
+    v.addColorStop(0, 'rgba(0,0,0,0)');
+    v.addColorStop(1, `rgba(0,0,0,${0.55*eyesDim})`);
+    cx.fillStyle = v; cx.fillRect(0, 0, W, H);
+  }
 }
 
 /* === GAME LOOP === */
@@ -387,8 +401,12 @@ function tick(ts) {
     else kekkouT = 0;
   }
 
-  // Idle micro-ripples (less when calm)
-  if (!S.eyesClosed && Math.random() < (1 - S.stillness/100) * .016) {
+  // 目を閉じている度合いをなめらかに追従（reduceMotion 時は即時）
+  const targetDim = S.eyesClosed ? 1 : 0;
+  eyesDim += (targetDim - eyesDim) * (reduceMotion ? 1 : 0.08);
+
+  // 環境のアンビエントな波紋。reduceMotion 時は出さない（タップ等のフィードバックは残す）
+  if (!S.eyesClosed && !reduceMotion && Math.random() < (1 - S.stillness/100) * .016) {
     addRipple(W*(.25+Math.random()*.5), H*(.3+Math.random()*.4), .2, false);
   }
 
@@ -406,7 +424,11 @@ function updateUI() {
   document.getElementById('st-num').textContent = st;
   document.getElementById('st-fill').style.width = st + '%';
   document.getElementById('satori-num').textContent = Math.floor(S.satori);
-  if (shopOpen) renderPhilCards();
+  // カード行は「招ける顔ぶれが変わった時」だけ再描画（毎フレーム作り直すとスクロール位置が飛ぶ）
+  if (shopOpen) {
+    const sig = S.invited.length + '|' + PHILS.map(p => S.satori >= p.cost ? '1' : '0').join('');
+    if (sig !== philSig) { philSig = sig; renderPhilCards(); }
+  }
 }
 
 /* === EVENTS === */
@@ -474,6 +496,7 @@ function invitePhil(id) {
 
 /* === PHIL CARDS === */
 let shopOpen = false;
+let philSig = '';
 function renderPhilCards() {
   const row = document.getElementById('phil-row');
   row.innerHTML = '';
@@ -556,8 +579,11 @@ document.getElementById('shop-btn').addEventListener('click', e => {
   shopOpen = !shopOpen;
   const row = document.getElementById('phil-row');
   const btn = document.getElementById('shop-btn');
-  if (shopOpen) { row.style.display = 'flex'; btn.textContent = '哲学者を招く ▴'; renderPhilCards(); }
-  else { row.style.display = 'none'; btn.textContent = '哲学者を招く ▾'; }
+  if (shopOpen) {
+    row.style.display = 'flex'; btn.textContent = '哲学者を招く ▴';
+    renderPhilCards();
+    philSig = S.invited.length + '|' + PHILS.map(p => S.satori >= p.cost ? '1' : '0').join('');
+  } else { row.style.display = 'none'; btn.textContent = '哲学者を招く ▾'; }
 });
 
 document.getElementById('kk-close').addEventListener('click', e => {
