@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nagi-0.1.0';
+const CACHE_NAME = 'nagi-0.2.0';
 const CACHE_URLS = ['./', './index.html', './manifest.json', './icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
